@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AnimeDex — Find Anime Characters</title>
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="AD-Anime.css" />
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand">
+      <img src="https://tse3.mm.bing.net/th/id/OIP.F3qt09rZBiSWrnRywlCl4AHaFU?pid=Api&P=0&h=180" alt="AnimeDex" class="logo">
+      <h1>AnimeDex</h1>
+    </div>
+
+    <nav class="nav">
+      <a class="nav-link active" href="index.html">
+        <img src="https://tse4.mm.bing.net/th/id/OIP.WnK1vJs2BjGqyaFWdwdwiwHaHa?pid=Api&P=0&h=180" alt="">
+        Home
+      </a>
+    </nav>
+  </header>
+  <button onclick="logout()">Logout</button>
+
+<script>
+function logout() {
+    localStorage.removeItem("isLoggedIn");
+    window.location.href = "login.html";
+}
+</script>
+
+  <main class="container">
+
+    <section class="hero">
+      <img src="https://tse1.mm.bing.net/th/id/OIP.TTrJY75A60UIeajxQzo8owHaCH?pid=Api&P=0&h=180" class="banner">
+
+      <form id="search-form" class="search">
+        <input
+          type="text"
+          id="search-input"
+          placeholder="Search characters (Levi, Naruto, Luffy...)"
+          autocomplete="off"
+          required
+        >
+
+        <button type="submit" class="btn">
+          Search
+        </button>
+      </form>
+    </section>
+
+    <section id="status" class="status"></section>
+
+    <section id="results" class="grid"></section>
+
+  </main>
+
+  <footer class="footer">
+    <p>Data by MyAnimeList via Jikan API.</p>
+  </footer>
+
+  <script src="AD-Anime.js"></script>
+
+</body>
+</html>
