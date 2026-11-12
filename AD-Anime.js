@@ -1,7 +1,60 @@
+// ---- Login guard: redirect to login if not signed in ----
+function isLoggedIn() {
+    return localStorage.getItem("isLoggedIn") === "true" ||
+           sessionStorage.getItem("isLoggedIn") === "true";
+}
+
+if (!isLoggedIn()) {
+    window.location.replace("Login.html");
+}
+
 const form = document.getElementById("search-form");
 const input = document.getElementById("search-input");
 const results = document.getElementById("results");
-const status = document.getElementById("status");
+const statusEl = document.getElementById("status");
+
+// ---- Logout ----
+document.getElementById("logout-btn").addEventListener("click", function () {
+    localStorage.removeItem("isLoggedIn");
+    sessionStorage.removeItem("isLoggedIn");
+    window.location.href = "Login.html";
+});
+
+// ---- Escape text before putting it in innerHTML ----
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+// AniList descriptions contain HTML tags, __bold__ markers and ~!spoilers!~
+function cleanDescription(text) {
+    return text
+        .replace(/~!.*?!~/gs, "")      // remove spoilers
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<[^>]+>/g, "")       // strip other tags
+        .replace(/[_*]{2}/g, "")       // strip bold markers
+        .trim();
+}
+
+// ---- AniList GraphQL (free, no API key) ----
+const ANILIST_URL = "https://graphql.anilist.co";
+
+const SEARCH_QUERY = `
+query ($search: String) {
+  Page(perPage: 12) {
+    characters(search: $search) {
+      id
+      name { full native }
+      image { large }
+      description
+      favourites
+    }
+  }
+}`;
 
 form.addEventListener("submit", function (e) {
     e.preventDefault();
@@ -9,75 +62,85 @@ form.addEventListener("submit", function (e) {
 });
 
 async function searchCharacter() {
-
     const query = input.value.trim();
 
     if (!query) {
-        status.innerHTML = "Please enter a character name.";
+        statusEl.textContent = "Please enter a character name.";
         return;
     }
 
-    status.innerHTML = "Searching...";
+    statusEl.textContent = "Searching...";
     results.innerHTML = "";
 
     try {
+        const response = await fetch(ANILIST_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            body: JSON.stringify({
+                query: SEARCH_QUERY,
+                variables: { search: query }
+            })
+        });
 
-        const response = await fetch(
-            `https://api.jikan.moe/v4/characters?q=${encodeURIComponent(query)}&limit=12`
-        );
-
-        const data = await response.json();
-
-        if (!data.data || data.data.length === 0) {
-            status.innerHTML = "No characters found.";
+        if (!response.ok) {
+            statusEl.textContent = response.status === 429
+                ? "Too many requests. Please wait a minute and try again."
+                : `Server error (${response.status}). Please try again.`;
             return;
         }
 
-        status.innerHTML = `Found ${data.data.length} character(s).`;
+        const json = await response.json();
 
-        results.innerHTML = data.data.map(character => {
+        if (json.errors) {
+            console.error(json.errors);
+            statusEl.textContent = "The API returned an error. Please try again.";
+            return;
+        }
+
+        const characters = json.data?.Page?.characters || [];
+
+        if (characters.length === 0) {
+            statusEl.textContent = "No characters found.";
+            return;
+        }
+
+        statusEl.textContent = `Found ${characters.length} character(s).`;
+
+        results.innerHTML = characters.map(character => {
+            const name = escapeHtml(character.name.full);
+            const native = character.name.native
+                ? `<p class="card-sub">${escapeHtml(character.name.native)}</p>`
+                : "";
+            const img = character.image?.large || "";
+
+            let about = "No description available.";
+            if (character.description) {
+                const text = cleanDescription(character.description);
+                if (text) {
+                    about = escapeHtml(text.length > 250 ? text.substring(0, 250) + "..." : text)
+                        .replace(/\n/g, "<br>");
+                }
+            }
 
             return `
             <div class="card">
-
-                <img
-                    src="${character.images.jpg.image_url}"
-                    alt="${character.name}"
-                    class="character-img"
-                >
-
+                <img src="${img}" alt="${name}" class="card-thumb" loading="lazy">
                 <div class="card-body">
-
-                    <h2>${character.name}</h2>
-
-                    <p>
-                    ${
-                        character.about
-                        ? character.about.substring(0,250).replace(/\n/g,"<br>") + "..."
-                        : "No description available."
-                    }
-                    </p>
-
-                    ${
-                        character.favorites
-                        ? `<p><strong>Favorites:</strong> ${character.favorites}</p>`
-                        : ""
-                    }
-
+                    <div class="card-title">${name}</div>
+                    ${native}
+                    <p class="card-sub">${about}</p>
+                    ${character.favourites
+                        ? `<p><strong>Favorites:</strong> ${character.favourites}</p>`
+                        : ""}
                 </div>
-
-            </div>
-            `;
-
+            </div>`;
         }).join("");
 
-    }
-    catch(error){
-
+    } catch (error) {
         console.error(error);
-
-        status.innerHTML = "Unable to connect to Jikan API.";
-
+        statusEl.textContent = "Unable to connect to the anime API. Check your internet connection.";
     }
-
 }
